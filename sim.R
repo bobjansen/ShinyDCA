@@ -37,18 +37,20 @@ spx_spec <- ugarchspec(
   )
 )
 
-# create a GARCH specification with arbitrary daily drift
-create_spec <- function(mu_daily) {
+# create a GARCH specification with arbitrary daily drift and target volatility
+create_spec <- function(mu_daily, target_vol = 0.0098, alpha1 = 0.03, beta1 = 0.935, shape = 10) {
+  # target_vol is daily volatility (e.g., 0.01 for 1% daily)
+  omega <- (target_vol^2) * (1 - alpha1 - beta1)
   ugarchspec(
     variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
     mean.model = list(armaOrder = c(0, 0), include.mean = TRUE),
     distribution.model = "std",
     fixed.pars = list(
       mu     = mu_daily,
-      omega  = 6e-6,
-      alpha1 = 0.03,
-      beta1  = 0.935,
-      shape  = 10
+      omega  = omega,
+      alpha1 = alpha1,
+      beta1  = beta1,
+      shape  = shape
     )
   )
 }
@@ -152,10 +154,11 @@ portfolio_metrics <- function(price_mc, rf_daily = 0) {
   ann_vol <- sd_ret * ann_factor
 
   list(
-    avg_sharpe = mean(sharpe, na.rm = TRUE),
-    avg_drawdown = mean(drawdowns, na.rm = TRUE),
-    avg_ann_return = mean(ann_ret, na.rm = TRUE),
-    avg_ann_vol = mean(ann_vol, na.rm = TRUE),
+    avg_sharpe = mean(sharpe),
+    avg_drawdown = mean(drawdowns),
+    avg_ann_return = mean(ann_ret),
+    median_ann_return = median(ann_ret),
+    avg_ann_vol = mean(ann_vol),
     sharpe = sharpe,
     drawdowns = drawdowns,
     ann_return = ann_ret,

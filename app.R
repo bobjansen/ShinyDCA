@@ -85,20 +85,18 @@ server <- function(input, output) {
     if (is.null(m)) return(NULL)
     data.frame(
       Metric = c(
-        "Avg. Yearly Return",
-        "Avg. Yearly Volatility",
+        "Avg. Ann. Return %",
+        "Median Ann. Return %",
+        "Avg. Ann. Volatility",
         "Avg. Sharpe Ratio",
-        "Avg. Max Drawdown",
-        "Avg. Ann. Return",
-        "Avg. Ann. Volatility"
+        "Avg. Max Drawdown"
       ),
       Value = c(
-        round(m$avg_return * 252, 3),  # annualized return
-        round(m$avg_vol * sqrt(252), 3),  # annualized vol
+        round(m$avg_ann_return * 100, 3),
+        round(m$median_ann_return * 100, 3),
+        round(m$avg_ann_vol * 100, 3),
         round(m$avg_sharpe, 3),
-        round(m$avg_drawdown, 3),
-        round(m$avg_ann_return, 3),
-        round(m$avg_ann_vol, 3)
+        round(m$avg_drawdown, 3)
       )
     )
   }, digits = 3, rownames = FALSE)
