@@ -9,7 +9,7 @@ source("dca.R")
 n_paths <- 1000L
 n_months <- 12L
 
-# ---- Shiny app ----
+# Shiny app ----
 ui <- fluidPage(
   titlePanel("Dollar-Cost Averaging Simulation"),
   sidebarLayout(
@@ -75,12 +75,13 @@ server <- function(input, output) {
     df <- data.frame(
       Day = rep(seq_len(nrow(price_mc)), times = 20),
       Price = as.vector(price_mc[, pick]),
-      Path = rep(seq_len(20), each = nrow(price_mc))
+      Path = factor(rep(seq_len(20), each = nrow(price_mc)))
     )
-    ggplot(df, aes(Day, Price, group = Path)) +
+    ggplot(df, aes(Day, Price, group = Path, color = Path)) +
       geom_line(alpha = 0.6) +
       labs(title = "20 Random Price Paths", y = "Price") +
-      theme_minimal()
+      theme_minimal() +
+      guides(color = "none")
   })
 }
 
