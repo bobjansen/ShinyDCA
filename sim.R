@@ -13,10 +13,10 @@ mu_annual <- 0.04
 mu_daily <- log(1 + mu_annual) / 252
 
 # Jump parameters ----
-jump_lambda      <- 0.005   # expected jumps per day
-jump_mean        <- -0.02  # average jump size
-jump_sd          <-  0.25  # jump size st.dev.
-compensate_drift <- TRUE   # keep the original drift after adding jumps?
+jump_lambda <- 0.005 # expected jumps per day
+jump_mean <- -0.02 # average jump size
+jump_sd <- 0.25 # jump size st.dev.
+compensate_drift <- TRUE # keep the original drift after adding jumps?
 negative_only <- TRUE
 
 # 1. Specify a GARCH(1,1) with Student-t errors ----
@@ -57,8 +57,8 @@ create_spec <- function(mu_daily, target_vol = 0.0098, alpha1 = 0.03, beta1 = 0.
 
 reflected_normal_mean <- function(mu, sigma) {
   # E[-|X|] for X ~ N(mu, sigma^2)
-  - ( sigma * sqrt(2 / pi) * exp(- (mu^2) / (2 * sigma^2)) +
-        mu * (2 * pnorm(mu / sigma) - 1) )
+  -(sigma * sqrt(2 / pi) * exp(-(mu^2) / (2 * sigma^2)) +
+    mu * (2 * pnorm(mu / sigma) - 1))
 }
 
 simulate_prices <- function(
@@ -66,17 +66,16 @@ simulate_prices <- function(
     S0,
     spec = spx_spec,
     lambda = jump_lambda,
-    jmean  = jump_mean,
-    jsd    = jump_sd,
-    drift_fix   = compensate_drift,
+    jmean = jump_mean,
+    jsd = jump_sd,
+    drift_fix = compensate_drift,
     negative_only = TRUE,
-    seed   = NULL) {
-
+    seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
 
   # ---- 1. GARCH-t -------------------------------------------------
   sim_garch <- ugarchpath(spec, n.sim = n_days, m.sim = n_paths)
-  r_mc      <- fitted(sim_garch)
+  r_mc <- fitted(sim_garch)
 
   # ---- 2. Jump matrix --------------------------------------------
   jump_occ <- matrix(
@@ -94,12 +93,12 @@ simulate_prices <- function(
   }
 
   jump_size <- matrix(rdraw(n_days * n_paths), nrow = n_days)
-  J         <- jump_occ * jump_size
+  J <- jump_occ * jump_size
 
   # ---- 3. Drift compensation -------------------------------------
   r_mc <- if (drift_fix) {
     if (negative_only) {
-      mu_jump <- reflected_normal_mean(jmean, jsd)  # ≈ -0.0270
+      mu_jump <- reflected_normal_mean(jmean, jsd) # ≈ -0.0270
     } else {
       mu_jump <- jmean
     }
