@@ -67,19 +67,19 @@ simulate_prices <- function(
     drift_fix   = compensate_drift,
     negative_only = TRUE,
     seed   = NULL) {
-  
+
   if (!is.null(seed)) set.seed(seed)
-  
+
   # ---- 1. GARCH-t -------------------------------------------------
   sim_garch <- ugarchpath(spec, n.sim = n_days, m.sim = n_paths)
   r_mc      <- fitted(sim_garch)
-  
+
   # ---- 2. Jump matrix --------------------------------------------
   jump_occ <- matrix(
     rbinom(n_days * n_paths, size = 1, prob = lambda),
     nrow = n_days
   )
-  
+
   rdraw <- if (negative_only) {
     function(n) {
       x <- rnorm(n, mean = jmean, sd = jsd)
@@ -88,10 +88,10 @@ simulate_prices <- function(
   } else {
     function(n) rnorm(n, mean = jmean, sd = jsd)
   }
-  
+
   jump_size <- matrix(rdraw(n_days * n_paths), nrow = n_days)
   J         <- jump_occ * jump_size
-  
+
   # ---- 3. Drift compensation -------------------------------------
   r_mc <- if (drift_fix) {
     if (negative_only) {
@@ -103,7 +103,7 @@ simulate_prices <- function(
   } else {
     r_mc + J
   }
-  
+
   # ---- 4. Prices --------------------------------------------------
   S0 * exp(apply(r_mc, 2, cumsum))
 }
@@ -129,9 +129,45 @@ plot_random_paths <- function(price_mc, n = 10, seed = NULL) {
   )
 }
 
+portfolio_metrics <- function(price_mc, rf_daily = 0) {
+  # price_mc: matrix of prices (rows: days, cols: paths)
+  # rf_daily: daily risk-free rate (default 0)
+
+  returns <- diff(price_mc) / price_mc[-nrow(price_mc), ]
+  mean_ret <- colMeans(returns)
+  sd_ret <- apply(returns, 2, sd)
+  sharpe <- (mean_ret - rf_daily) / sd_ret
+
+  # Drawdown calculation
+  max_drawdown <- function(prices) {
+    cummaxp <- cummax(prices)
+    drawdowns <- (prices - cummaxp) / cummaxp
+    min(drawdowns)
+  }
+  drawdowns <- apply(price_mc, 2, max_drawdown)
+
+  # Annualized metrics
+  ann_factor <- sqrt(252)
+  ann_ret <- (price_mc[nrow(price_mc), ] / price_mc[1, ])^(252 / (nrow(price_mc) - 1)) - 1
+  ann_vol <- sd_ret * ann_factor
+
+  list(
+    avg_sharpe = mean(sharpe, na.rm = TRUE),
+    avg_drawdown = mean(drawdowns, na.rm = TRUE),
+    avg_ann_return = mean(ann_ret, na.rm = TRUE),
+    avg_ann_vol = mean(ann_vol, na.rm = TRUE),
+    sharpe = sharpe,
+    drawdowns = drawdowns,
+    ann_return = ann_ret,
+    ann_vol = ann_vol
+  )
+}
+
 if (sys.nframe() == 0) {
   price_mc <- simulate_prices(n_days, n_paths, seed = seed)
+  metrics <- portfolio_metrics(price_mc)
   print(summary(price_mc[252, ]))
+  print(metrics)
   boxplot(price_mc[252, ])
   plot_random_paths(price_mc, n = 20)
 }

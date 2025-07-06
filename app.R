@@ -5,8 +5,7 @@ library(rugarch)
 source("sim.R")
 source("dca.R")
 
-# reduce paths to keep the app responsive
-n_paths <- 1000L
+n_paths <- 5000L
 n_months <- 12L
 
 # Shiny app ----
@@ -48,7 +47,8 @@ server <- function(input, output) {
       df = data.frame(month = months_seq,
                       CE = dca_ce,
                       lump_sum = lsum$CE_ratio),
-      prices = price_mc
+      prices = price_mc,
+      metrics = portfolio_metrics(price_mc)
     )
   })
 
@@ -79,6 +79,15 @@ server <- function(input, output) {
       theme_minimal() +
       guides(color = "none")
   })
+
+  output$metricsTable <- renderTable({
+    m <- results()$metrics
+    if (is.null(m)) return(NULL)
+    data.frame(
+      Metric = c("Avg. Sharpe Ratio", "Avg. Max Drawdown", "Avg. Ann. Return", "Avg. Ann. Volatility"),
+      Value = c(round(m$avg_sharpe, 3), round(m$avg_drawdown, 3), round(m$avg_ann_return, 3), round(m$avg_ann_vol, 3))
+    )
+  }, digits = 3, rownames = FALSE)
 }
 
 shinyApp(ui, server)
