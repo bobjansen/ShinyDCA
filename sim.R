@@ -1,12 +1,23 @@
 # install.packages("rugarch")           # run once
 library(rugarch)
 
+# MC parameters ----
 seed <- 42L
-S0 <- 6000
+
 n_days <- 252L # 1 trading year
 n_paths <- 10000L # Monte-Carlo replications
-mu_annual <- 0.06
+
+# SP500 parameters ----
+S0 <- 6000
+mu_annual <- 0.04
 mu_daily <- log(1 + mu_annual) / 252
+
+# Jump parameters ----
+jump_lambda      <- 0.02   # expected jumps per day
+jump_mean        <- -0.02  # average jump size
+jump_sd          <-  0.05  # jump size st.dev.
+compensate_drift <- TRUE   # keep the original drift after adding jumps?
+negative_only <- TRUE
 
 # 1. Specify a GARCH(1,1) with Student-t errors ----
 # ChatGPT o3 found some specs here:
@@ -26,17 +37,58 @@ spx_spec <- ugarchspec(
   )
 )
 
+reflected_normal_mean <- function(mu, sigma) {
+  # E[-|X|] for X ~ N(mu, sigma^2)
+  - ( sigma * sqrt(2 / pi) * exp(- (mu^2) / (2 * sigma^2)) +
+        mu * (2 * pnorm(mu / sigma) - 1) )
+}
 
-simulate_prices <- function(n_days, n_path, seed = NULL) {
-  if (!is.null(seed)) {
-    set.seed(seed)
+simulate_prices <- function(
+    n_days, n_paths,
+    lambda = jump_lambda,
+    jmean  = jump_mean,
+    jsd    = jump_sd,
+    drift_fix   = compensate_drift,
+    negative_only = TRUE,
+    seed   = NULL) {
+  
+  if (!is.null(seed)) set.seed(seed)
+  
+  # ---- 1. GARCH-t -------------------------------------------------
+  sim_garch <- ugarchpath(spx_spec, n.sim = n_days, m.sim = n_paths)
+  r_mc      <- fitted(sim_garch)
+  
+  # ---- 2. Jump matrix --------------------------------------------
+  jump_occ <- matrix(
+    rbinom(n_days * n_paths, size = 1, prob = lambda),
+    nrow = n_days
+  )
+  
+  rdraw <- if (negative_only) {
+    function(n) {
+      x <- rnorm(n, mean = jmean, sd = jsd)
+      ifelse(x > 0, -x, x)
+    }
+  } else {
+    function(n) rnorm(n, mean = jmean, sd = jsd)
   }
-
-  sim_paths <- ugarchpath(spx_spec, n.sim = n_days, m.sim = n_paths)
-
-  # matrix of simulated returns (n_days × n_paths)
-  r_mc <- fitted(sim_paths)
-
+  
+  jump_size <- matrix(rdraw(n_days * n_paths), nrow = n_days)
+  J         <- jump_occ * jump_size
+  
+  # ---- 3. Drift compensation -------------------------------------
+  r_mc <- if (drift_fix) {
+    if (negative_only) {
+      mu_jump <- reflected_normal_mean(jmean, jsd)  # ≈ -0.0270
+    } else {
+      mu_jump <- jmean
+    }
+    r_mc - lambda * mu_jump + J
+  } else {
+    r_mc + J
+  }
+  
+  # ---- 4. Prices --------------------------------------------------
   S0 * exp(apply(r_mc, 2, cumsum))
 }
 

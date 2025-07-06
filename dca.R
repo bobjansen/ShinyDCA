@@ -1,6 +1,6 @@
 library(ggplot2)
 
-# source("sim.R")
+#source("sim.R")
 
 gammas <- 1:4
 
@@ -138,7 +138,7 @@ ggplot(df[df$strategy != "Lump sum", ],          # plot DCA lines …
   geom_hline(data = df[df$strategy == "Lump sum", ],
              aes(yintercept = EU),
              linetype = 3, colour = "black") +
-  facet_wrap(~ gamma, ncol = 1, scales = "fixed",
+  facet_wrap(~ gamma, ncol = 2, scales = "fixed",
              labeller = label_bquote(gamma == .(gamma))) +
   labs(x = "Number of months invested",
        y = "Expected CRRA utility",
@@ -146,5 +146,6 @@ ggplot(df[df$strategy != "Lump sum", ],          # plot DCA lines …
        title = paste(
          "Dollar-Cost Averaging vs. Lump-Sum for γ = ", 
          paste(gammas, collapse = ", "))) +
+  scale_x_continuous(breaks = 0:12) +
   theme_bw() +
   theme(legend.position = "bottom")
