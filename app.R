@@ -22,6 +22,37 @@ ui <- fluidPage(
       numericInput("gamma", "Risk Aversion (gamma)",
         value = 1, min = 0.1, max = 5,
         step = 0.1
+      ),
+      numericInput("rf", "Risk-Free Rate (annual, decimal)",
+        value = 0, min = -0.1, max = 0.2, step = 0.01
+      ),
+      numericInput("seed", "Random Seed",
+        value = 42, min = 1, max = 1e6, step = 1
+      ),
+      tags$hr(),
+      tags$details(
+        tags$summary(HTML('Advanced Settings (GARCH Model) <span style="font-size:0.9em;">&#9654;</span>')),
+        numericInput("alpha", "GARCH: alpha",
+          value = 0.05, min = 0, max = 1, step = 0.01
+        ),
+        numericInput("beta", "GARCH: beta",
+          value = 0.9, min = 0, max = 1, step = 0.01
+        ),
+        numericInput("shape", "GARCH: shape (Student-t df)",
+          value = 10, min = 2.1, max = 50, step = 0.1
+        ),
+        tags$hr(),
+        numericInput("jump_lambda", "Jump: lambda (expected jumps/day)",
+          value = 0.005, min = 0, max = 0.1, step = 0.001
+        ),
+        numericInput("jump_mean", "Jump: mean (average jump size)",
+          value = -0.02, min = -1, max = 1, step = 0.01
+        ),
+        numericInput("jump_sd", "Jump: sd (jump size st.dev.)",
+          value = 0.25, min = 0, max = 2, step = 0.01
+        ),
+        checkboxInput("compensate_drift", "Compensate drift for jumps?", value = TRUE),
+        checkboxInput("negative_only", "Negative jumps only?", value = TRUE)
       )
     ),
     mainPanel(
@@ -37,18 +68,32 @@ server <- function(input, output) {
     months_seq <- 1:n_months
 
     mu_daily <- log(1 + input$mu) / 252
-    spec <- create_spec(mu_daily)
-    price_mc <- simulate_prices(n_days, n_paths, S0, spec = spec, seed = seed)
+    spec <- create_spec(
+      mu_daily,
+      alpha1 = input$alpha,
+      beta1 = input$beta,
+      shape = input$shape
+    )
+    price_mc <- simulate_prices(
+      n_days, n_paths, S0, spec = spec, seed = input$seed,
+      lambda = input$jump_lambda,
+      jmean = input$jump_mean,
+      jsd = input$jump_sd,
+      drift_fix = input$compensate_drift,
+      negative_only = input$negative_only
+    )
 
     lsum <- simulate_dca(price_mc,
       months = 1, trades_per_month = 1,
-      gamma = input$gamma
+      gamma = input$gamma,
+      rf = input$rf
     )
     dca_ce <- sapply(months_seq, function(m) {
       simulate_dca(price_mc,
         months = m,
         trades_per_month = input$trades,
-        gamma = input$gamma
+        gamma = input$gamma,
+        rf = input$rf
       )$CE_ratio
     })
 
@@ -66,7 +111,7 @@ server <- function(input, output) {
   output$dcaPlot <- renderPlot({
     df <- results()$df
     if (nrow(df) == 0) {
-      return(NULL)
+      return()
     }
     ggplot(df, aes(month, CE)) +
       geom_line(color = "steelblue") +
@@ -83,7 +128,7 @@ server <- function(input, output) {
   output$pathPlot <- renderPlot({
     price_mc <- results()$prices
     if (is.null(price_mc)) {
-      return(NULL)
+      return()
     }
     pick <- sample(ncol(price_mc), 20)
     df <- data.frame(
@@ -102,7 +147,7 @@ server <- function(input, output) {
     {
       m <- results()$metrics
       if (is.null(m)) {
-        return(NULL)
+        return()
       }
       data.frame(
         Metric = c(
