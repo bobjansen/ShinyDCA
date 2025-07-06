@@ -7,6 +7,7 @@ source("dca.R")
 
 n_paths <- 5000L
 n_months <- 12L
+S0 <- 6000
 
 # Shiny app ----
 ui <- fluidPage(
@@ -33,7 +34,7 @@ server <- function(input, output) {
 
     mu_daily <- log(1 + input$mu) / 252
     spec <- create_spec(mu_daily)
-    price_mc <- simulate_prices(n_days, n_paths, spec = spec, seed = seed)
+    price_mc <- simulate_prices(n_days, n_paths, S0, spec = spec, seed = seed)
 
     lsum <- simulate_dca(price_mc, months = 1, trades_per_month = 1,
                          gamma = input$gamma)
@@ -48,7 +49,7 @@ server <- function(input, output) {
                       CE = dca_ce,
                       lump_sum = lsum$CE_ratio),
       prices = price_mc,
-      metrics = portfolio_metrics(price_mc)
+      metrics = portfolio_metrics(price_mc, S0)
     )
   })
 
@@ -61,6 +62,7 @@ server <- function(input, output) {
       geom_hline(aes(yintercept = lump_sum), linetype = 2, color = "red") +
       labs(x = "Number of Months", y = "Certainty Equivalent",
            title = "DCA vs. Lump Sum") +
+      scale_x_continuous(breaks = 0:12) +
       theme_minimal()
   })
 

@@ -13,9 +13,9 @@ mu_annual <- 0.04
 mu_daily <- log(1 + mu_annual) / 252
 
 # Jump parameters ----
-jump_lambda      <- 0.02   # expected jumps per day
+jump_lambda      <- 0.005   # expected jumps per day
 jump_mean        <- -0.02  # average jump size
-jump_sd          <-  0.05  # jump size st.dev.
+jump_sd          <-  0.25  # jump size st.dev.
 compensate_drift <- TRUE   # keep the original drift after adding jumps?
 negative_only <- TRUE
 
@@ -62,7 +62,9 @@ reflected_normal_mean <- function(mu, sigma) {
 }
 
 simulate_prices <- function(
-    n_days, n_paths, spec = spx_spec,
+    n_days, n_paths,
+    S0,
+    spec = spx_spec,
     lambda = jump_lambda,
     jmean  = jump_mean,
     jsd    = jump_sd,
@@ -107,7 +109,11 @@ simulate_prices <- function(
   }
 
   # ---- 4. Prices --------------------------------------------------
-  S0 * exp(apply(r_mc, 2, cumsum))
+  returns <- S0 * exp(apply(r_mc, 2, cumsum))
+
+  # ---- 5. Normalize mean return ---------------------------------
+  mean_target <- spec@model$fixed.pars$mu
+  returns * exp(n_days * mean_target) / (mean(returns[n_days, ]) / S0)
 }
 
 plot_random_paths <- function(price_mc, n = 10, seed = NULL) {
@@ -131,7 +137,7 @@ plot_random_paths <- function(price_mc, n = 10, seed = NULL) {
   )
 }
 
-portfolio_metrics <- function(price_mc, rf_daily = 0) {
+portfolio_metrics <- function(price_mc, S0, rf_daily = 0) {
   # price_mc: matrix of prices (rows: days, cols: paths)
   # rf_daily: daily risk-free rate (default 0)
 
@@ -150,14 +156,14 @@ portfolio_metrics <- function(price_mc, rf_daily = 0) {
 
   # Annualized metrics
   ann_factor <- sqrt(252)
-  ann_ret <- (price_mc[nrow(price_mc), ] / price_mc[1, ])^(252 / (nrow(price_mc) - 1)) - 1
+  ann_ret <- price_mc[nrow(price_mc), ] / S0
   ann_vol <- sd_ret * ann_factor
 
   list(
     avg_sharpe = mean(sharpe),
     avg_drawdown = mean(drawdowns),
-    avg_ann_return = mean(ann_ret),
-    median_ann_return = median(ann_ret),
+    avg_ann_return = mean(ann_ret) - 1,
+    median_ann_return = median(ann_ret) - 1,
     avg_ann_vol = mean(ann_vol),
     sharpe = sharpe,
     drawdowns = drawdowns,
@@ -167,8 +173,8 @@ portfolio_metrics <- function(price_mc, rf_daily = 0) {
 }
 
 if (sys.nframe() == 0) {
-  price_mc <- simulate_prices(n_days, n_paths, seed = seed)
-  metrics <- portfolio_metrics(price_mc)
+  price_mc <- simulate_prices(n_days, n_paths, S0, seed = seed)
+  metrics <- portfolio_metrics(price_mc, S0 = S0)
   print(summary(price_mc[252, ]))
   print(metrics)
   boxplot(price_mc[252, ])
