@@ -4,6 +4,9 @@ library(ggplot2)
 
 gammas <- 1:4
 
+trades_per_month_option <- 5
+trades_per_month_text <- paste0("DCA ", trades_per_month_option, " -trades")
+
 # Helper: generic DCA simulator under log-utility
 simulate_dca <- function(
     P, # price matrix (n_days × n_paths)
@@ -59,9 +62,7 @@ simulate_dca <- function(
   )
 }
 
-oldpar <- par(no.readonly = TRUE)
-par(mfrow = c(length(gammas), 1), mar = c(4, 5, 3, 1) + 0.1)
-
+res_all <- list()
 for (gamma in gammas) {
   #  Run all strategies ----
   strategies <- data.frame(
@@ -99,11 +100,15 @@ for (gamma in gammas) {
   
   ## 2) DCA: 3 trades / month
   for (m in 1:12) {
-    res <- simulate_dca(price_mc, months = m, trades_per_month = 3, gamma = gamma)
+    res <- simulate_dca(
+      price_mc, 
+      months = m, 
+      trades_per_month = trades_per_month_option, 
+      gamma = gamma)
     strategies <- rbind(
       strategies,
       data.frame(
-        strategy = "DCA 3-trades",
+        strategy = trades_per_month_text,
         months = m,
         EU = res$EU,
         CE = res$CE_absolute
@@ -113,31 +118,33 @@ for (gamma in gammas) {
   
   print(strategies, row.names = FALSE, digits = 4)
   
-  ##  Visualise ----
-  op <- par(mar = c(4, 5, 4, 1) + 0.1)
-  plot(
-    EU ~ months,
-    data = strategies[strategies$strategy == "DCA 1-trade", ],
-    type = "o", pch = 19, lty = 1, xlim = c(0, 12),
-    ylim = range(strategies$EU),
-    xlab = "Number of months invested",
-    ylab = "Expected log-utility  E[log(W_T)]",
-    main = paste0("Dollar-Cost Averaging vs. Lump-Sum (CRRA with gamma = ", gamma, ")")
-  )
-  lines(EU ~ months,
-    data = strategies[strategies$strategy == "DCA 3-trades", ],
-    type = "o", pch = 17, lty = 2
-  )
-  abline(h = strategies$EU[strategies$strategy == "Lump sum"], lty = 3)
-  legend("bottomright",
-    legend = c(
-      "DCA (1 trade / month)",
-      "DCA (3 trades / month)",
-      "Lump-sum"
-    ),
-    lty = c(1, 2, 3), pch = c(19, 17, NA), bty = "n"
-  )
-  par(op)
+  res_all[[as.character(gamma)]] <- strategies
 }
 
-par(oldpar)        # restore settings
+##  Visualise ----
+df <- do.call(rbind, Map(cbind,
+                         gamma = gammas,
+                         res_all))
+
+## prettier labels for legend
+df$strategy <- factor(df$strategy,
+                      levels = c("Lump sum", "DCA 1-trade", trades_per_month_text))
+
+ggplot(df[df$strategy != "Lump sum", ],          # plot DCA lines …
+       aes(months, EU, colour = strategy,
+           linetype = strategy, shape = strategy)) +
+  geom_line() +
+  geom_point(size = 2) +
+  geom_hline(data = df[df$strategy == "Lump sum", ],
+             aes(yintercept = EU),
+             linetype = 3, colour = "black") +
+  facet_wrap(~ gamma, ncol = 1, scales = "fixed",
+             labeller = label_bquote(gamma == .(gamma))) +
+  labs(x = "Number of months invested",
+       y = "Expected CRRA utility",
+       colour = "", linetype = "", shape = "",
+       title = paste(
+         "Dollar-Cost Averaging vs. Lump-Sum for γ = ", 
+         paste(gammas, collapse = ", "))) +
+  theme_bw() +
+  theme(legend.position = "bottom")
