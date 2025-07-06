@@ -13,7 +13,8 @@ simulate_dca <- function(
     total = 1e6, # dollars to invest
     months = 1, # spread over 1…12 months
     trades_per_month = 1, # 1 or 3,
-    gamma = 1 # CRRA lambda, with gamma = 1: log utility
+    gamma = 1, # CRRA with gamma = 1: log utility
+    rf = 0 # risk-free rate (annualized, continuously compounded)
     ) {
   n_days <- nrow(P)
   n_paths <- ncol(P)
@@ -32,17 +33,36 @@ simulate_dca <- function(
   # dollar amount per trade ----
   allot <- total / length(invest_dates)
 
-  # shares bought on each path & date ----
-  shares_mat <- allot / P[invest_dates, ] # matrix (n_trades × n_paths)
+  # Track uninvested cash and invested shares ----
+  cash <- rep(0, length(invest_dates) + 1) # cash before each investment
+  cash[1] <- total
+  shares_mat <- matrix(0, nrow = length(invest_dates), ncol = n_paths)
+
+  for (i in seq_along(invest_dates)) {
+    # Grow uninvested cash at risk-free rate until this investment date
+    if (rf != 0 && i > 1) {
+      days_waited <- invest_dates[i] - invest_dates[i-1]
+      cash[i] <- cash[i] * exp(rf * days_waited / 252) # 252 trading days/year
+    }
+    # Invest
+    shares_mat[i, ] <- allot / P[invest_dates[i], ]
+    cash[i+1] <- cash[i] - allot
+  }
+  # Grow any remaining cash to the end
+  if (rf != 0 && cash[length(cash)] > 0) {
+    days_left <- n_days - invest_dates[length(invest_dates)]
+    cash[length(cash)] <- cash[length(cash)] * exp(rf * days_left / 252)
+  }
+
   # Calculate the number of shares obtained by investing over the period
-  shares_total <- if (is.null(dim(shares_mat))) {
+  shares_total <- if (is.null(dim(shares_mat)) || ncol(shares_mat) == 1) {
     shares_mat
   } else {
     colSums(shares_mat)
   }
 
-  # final wealth & log-utility ----
-  W_final <- shares_total * P[n_days, ]
+  # final wealth = invested + uninvested cash
+  W_final <- shares_total * P[n_days, ] + cash[length(cash)]
   relative_wealth <- W_final / total
 
   # CRRA utility ----
