@@ -37,6 +37,22 @@ spx_spec <- ugarchspec(
   )
 )
 
+# create a GARCH specification with arbitrary daily drift
+create_spec <- function(mu_daily) {
+  ugarchspec(
+    variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
+    mean.model = list(armaOrder = c(0, 0), include.mean = TRUE),
+    distribution.model = "std",
+    fixed.pars = list(
+      mu     = mu_daily,
+      omega  = 6e-6,
+      alpha1 = 0.03,
+      beta1  = 0.935,
+      shape  = 10
+    )
+  )
+}
+
 reflected_normal_mean <- function(mu, sigma) {
   # E[-|X|] for X ~ N(mu, sigma^2)
   - ( sigma * sqrt(2 / pi) * exp(- (mu^2) / (2 * sigma^2)) +
@@ -44,7 +60,7 @@ reflected_normal_mean <- function(mu, sigma) {
 }
 
 simulate_prices <- function(
-    n_days, n_paths,
+    n_days, n_paths, spec = spx_spec,
     lambda = jump_lambda,
     jmean  = jump_mean,
     jsd    = jump_sd,
@@ -55,7 +71,7 @@ simulate_prices <- function(
   if (!is.null(seed)) set.seed(seed)
   
   # ---- 1. GARCH-t -------------------------------------------------
-  sim_garch <- ugarchpath(spx_spec, n.sim = n_days, m.sim = n_paths)
+  sim_garch <- ugarchpath(spec, n.sim = n_days, m.sim = n_paths)
   r_mc      <- fitted(sim_garch)
   
   # ---- 2. Jump matrix --------------------------------------------
@@ -113,7 +129,9 @@ plot_random_paths <- function(price_mc, n = 10, seed = NULL) {
   )
 }
 
-price_mc <- simulate_prices(n_days, n_paths, seed = seed)
-print(summary(price_mc[252, ]))
-boxplot(price_mc[252, ])
-plot_random_paths(price_mc, n = 20)
+if (sys.nframe() == 0) {
+  price_mc <- simulate_prices(n_days, n_paths, seed = seed)
+  print(summary(price_mc[252, ]))
+  boxplot(price_mc[252, ])
+  plot_random_paths(price_mc, n = 20)
+}

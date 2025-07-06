@@ -62,8 +62,9 @@ simulate_dca <- function(
   )
 }
 
-res_all <- list()
-for (gamma in gammas) {
+if (sys.nframe() == 0) {
+  res_all <- list()
+  for (gamma in gammas) {
   #  Run all strategies ----
   strategies <- data.frame(
     strategy = character(),
@@ -118,8 +119,8 @@ for (gamma in gammas) {
   
   print(strategies, row.names = FALSE, digits = 4)
   
-  res_all[[as.character(gamma)]] <- strategies
-}
+    res_all[[as.character(gamma)]] <- strategies
+  }
 
 ##  Visualise ----
 df <- do.call(rbind, Map(cbind,
@@ -130,7 +131,7 @@ df <- do.call(rbind, Map(cbind,
 df$strategy <- factor(df$strategy,
                       levels = c("Lump sum", "DCA 1-trade", trades_per_month_text))
 
-ggplot(df[df$strategy != "Lump sum", ],          # plot DCA lines …
+  ggplot(df[df$strategy != "Lump sum", ],          # plot DCA lines …
        aes(months, EU, colour = strategy,
            linetype = strategy, shape = strategy)) +
   geom_line() +
@@ -149,3 +150,4 @@ ggplot(df[df$strategy != "Lump sum", ],          # plot DCA lines …
   scale_x_continuous(breaks = 0:12) +
   theme_bw() +
   theme(legend.position = "bottom")
+}
