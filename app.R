@@ -18,15 +18,12 @@ ui <- fluidPage(
       numericInput("mu", "Annual Return Assumption", value = 0.04,
                    min = -0.5, max = 0.5, step = 0.01),
       numericInput("gamma", "Risk Aversion (gamma)", value = 1, min = 0.1, max = 5,
-                   step = 0.1),
-      checkboxInput("show_paths", "Show 20 Sample Paths", value = FALSE)
+                   step = 0.1)
     ),
     mainPanel(
       plotOutput("dcaPlot"),
-      conditionalPanel(
-        condition = "input.show_paths == true",
-        plotOutput("pathPlot")
-      )
+      plotOutput("pathPlot"),
+      tableOutput("metricsTable")
     )
   )
 )
@@ -68,7 +65,6 @@ server <- function(input, output) {
   })
 
   output$pathPlot <- renderPlot({
-    req(input$show_paths)
     price_mc <- results()$prices
     if (is.null(price_mc)) return(NULL)
     pick <- sample(ncol(price_mc), 20)
