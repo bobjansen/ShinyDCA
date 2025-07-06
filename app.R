@@ -19,8 +19,7 @@ ui <- fluidPage(
                    min = -0.5, max = 0.5, step = 0.01),
       numericInput("gamma", "Risk Aversion (gamma)", value = 1, min = 0.1, max = 5,
                    step = 0.1),
-      checkboxInput("show_paths", "Show 20 Sample Paths", value = FALSE),
-      actionButton("run", "Run Simulation")
+      checkboxInput("show_paths", "Show 20 Sample Paths", value = FALSE)
     ),
     mainPanel(
       plotOutput("dcaPlot"),
@@ -33,7 +32,7 @@ ui <- fluidPage(
 )
 
 server <- function(input, output) {
-  results <- eventReactive(input$run, {
+  results <- reactive({
     months_seq <- 1:n_months
 
     mu_daily <- log(1 + input$mu) / 252
