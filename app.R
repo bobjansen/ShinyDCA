@@ -7,13 +7,13 @@ source("dca.R")
 
 # reduce paths to keep the app responsive
 n_paths <- 1000L
+n_months <- 12L
 
 # ---- Shiny app ----
 ui <- fluidPage(
   titlePanel("Dollar-Cost Averaging Simulation"),
   sidebarLayout(
     sidebarPanel(
-      sliderInput("months", "Months to Invest", min = 1, max = 12, value = 6),
       numericInput("trades", "Trades per Month", value = 1, min = 1, max = 12),
       numericInput("mu", "Annual Return Assumption", value = 0.04,
                    min = -0.5, max = 0.5, step = 0.01),
@@ -29,7 +29,7 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   results <- eventReactive(input$run, {
-    months_seq <- 1:input$months
+    months_seq <- 1:n_months
 
     mu_daily <- log(1 + input$mu) / 252
     spec <- create_spec(mu_daily)
